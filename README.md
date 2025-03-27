@@ -22,7 +22,7 @@ Anify consists of three main components:
 Each component has its own setup instructions and requirements. Please refer to the respective READMEs:
 
 - [Frontend Documentation](frontend/README.md)
-- [Backend Documentation](java-backend/README.md)
+- [Backend Documentation](backend/README.md)
 
 ## Development
 

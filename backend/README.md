@@ -52,7 +52,7 @@ A Spring Boot application that integrates AniList and Spotify APIs to create mus
 1. Clone the repository
 2. Navigate to the backend directory:
    ```bash
-   cd java-backend
+   cd backend
    ```
 3. Create a `data` directory for the H2 database:
    ```bash
@@ -144,7 +144,7 @@ A Spring Boot application that integrates AniList and Spotify APIs to create mus
 
 ### Project Structure
 ```
-java-backend/
+backend/
 ├── src/
 │   ├── main/
 │   │   ├── java/
