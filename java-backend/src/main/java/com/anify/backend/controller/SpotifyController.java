@@ -38,7 +38,7 @@ public class SpotifyController {
     @PostMapping("/playlist")
     public ResponseEntity<Map<String, String>> createPlaylist(@RequestParam String username, @RequestParam String playlistName) {
         try {
-            String playlistId = spotifyService.createPlaylistFromUsername(username, playlistName);
+            String playlistId = spotifyService.createPlaylistFromUsername(username, playlistName, Long.valueOf(1));
             return ResponseEntity.ok(Map.of("playlistId", playlistId));
         } catch (RuntimeException e) {
             if (e.getMessage().contains("not authenticated")) {

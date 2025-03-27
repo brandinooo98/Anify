@@ -71,10 +71,6 @@ A Spring Boot application that integrates AniList and Spotify APIs to create mus
 
 ## API Documentation
 
-### GraphQL Endpoints
-- `/graphql` - Main GraphQL endpoint
-- `/graphiql` - GraphQL Playground for testing queries
-
 ### REST Endpoints
 
 #### Spotify Integration
@@ -118,9 +114,6 @@ A Spring Boot application that integrates AniList and Spotify APIs to create mus
 #### User
 - `id`: Long (Primary Key)
 - `username`: String
-- `spotifyAccessToken`: String
-- `spotifyRefreshToken`: String
-- `spotifyTokenExpiry`: Long
 - `series`: List<Series> (Many-to-Many)
 
 #### Series
@@ -141,6 +134,11 @@ A Spring Boot application that integrates AniList and Spotify APIs to create mus
 - `id`: Long (Primary Key)
 - `user`: User (Many-to-One)
 - `series`: Series (Many-to-One)
+
+#### SpotifyAuth
+- `id`: Long (Primary Key)
+- `accessToken`: String
+- `refreshToken`: String
 
 ## Development
 

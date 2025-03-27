@@ -83,8 +83,6 @@ public class UserService {
     public User updateUser(Long id, User userDetails) {
         User user = getUserById(id);
         user.setUsername(userDetails.getUsername());
-        user.setSpotifyAccessToken(userDetails.getSpotifyAccessToken());
-        user.setSpotifyRefreshToken(userDetails.getSpotifyRefreshToken());
         return userRepository.save(user);
     }
 } 

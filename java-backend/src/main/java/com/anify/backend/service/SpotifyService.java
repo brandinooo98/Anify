@@ -2,6 +2,7 @@ package com.anify.backend.service;
 
 import com.anify.backend.model.User;
 import com.anify.backend.model.Song;
+import com.anify.backend.model.SpotifyAuth;
 import com.anify.backend.repository.UserRepository;
 import com.anify.backend.repository.SongRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,9 @@ public class SpotifyService {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private SpotifyAuthService spotifyAuthService;
 
     @Value("${spotify.client.id}")
     private String clientId;
@@ -74,12 +78,10 @@ public class SpotifyService {
             spotifyApi.setRefreshToken(credentials.getRefreshToken());
 
             // Get current user
-            User user = userRepository.findByUsername(spotifyApi.getCurrentUsersProfile().build().execute().getId());
-            if (user != null) {
-                user.setSpotifyAccessToken(credentials.getAccessToken());
-                user.setSpotifyRefreshToken(credentials.getRefreshToken());
-                userRepository.save(user);
-            }
+            SpotifyAuth spotifyAuth = spotifyAuthService.createSpotifyAuth(
+                credentials.getAccessToken(),
+                credentials.getRefreshToken()
+            );
 
             return "Successfully authenticated with Spotify!";
         } catch (Exception e) {
@@ -88,10 +90,10 @@ public class SpotifyService {
         }
     }
 
-    public String createPlaylistFromUsername(String username, String name) {
+    public String createPlaylistFromUsername(String username, String name, Long authId) {
         User user = userService.getUserById(userService.getUserIdByUsername(username));
-        if (user.getSpotifyAccessToken() == null || user.getSpotifyRefreshToken() == null) {
-            throw new RuntimeException("User not authenticated with Spotify");
+        if (user == null) {
+            throw new RuntimeException("User not found");
         }
 
         // Get all songs for the user
@@ -107,7 +109,7 @@ public class SpotifyService {
         }
 
         // Add songs to playlist
-        addSongsToPlaylist(user, playlistId, songs);
+        addSongsToPlaylist(authId, playlistId, songs);
 
         return playlistId;
     }
@@ -126,10 +128,11 @@ public class SpotifyService {
         }
     }
 
-    public void addSongsToPlaylist(User user, String playlistId, List<Song> songs) {
+    public void addSongsToPlaylist(Long authId, String playlistId, List<Song> songs) {
         try {
             // Set the access token
-            spotifyApi.setAccessToken(user.getSpotifyAccessToken());
+            SpotifyAuthService.SpotifyAuthCredentials spotifyAuth = spotifyAuthService.getSpotifyAuthCredentials(authId);
+            spotifyApi.setAccessToken(spotifyAuth.getAccessToken());
             
             List<String> uris = songs.stream()
                     .map(Song::getUri)

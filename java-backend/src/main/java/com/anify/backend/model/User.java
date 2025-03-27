@@ -16,12 +16,6 @@ public class User {
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(name = "spotify_access_token", length = 1000)
-    private String spotifyAccessToken;
-
-    @Column(name = "spotify_refresh_token", length = 1000)
-    private String spotifyRefreshToken;
-
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonManagedReference
     private List<UserSeries> userSeries;
