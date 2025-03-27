@@ -8,4 +8,5 @@ import java.util.List;
 public interface SongRepository extends JpaRepository<Song, Long> {
     List<Song> findByUserId(Long userId);
     List<Song> findBySeriesId(Long seriesId);
+    boolean existsByUri(String uri);
 } 

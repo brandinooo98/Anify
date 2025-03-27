@@ -1,25 +1,35 @@
 package com.anify.backend.service;
 
-import com.anify.backend.model.Song;
 import com.anify.backend.model.User;
+import com.anify.backend.model.Song;
 import com.anify.backend.repository.UserRepository;
+import com.anify.backend.repository.SongRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import se.michaelthelin.spotify.SpotifyApi;
+import se.michaelthelin.spotify.model_objects.credentials.AuthorizationCodeCredentials;
 import se.michaelthelin.spotify.model_objects.specification.Playlist;
 import se.michaelthelin.spotify.requests.data.playlists.CreatePlaylistRequest;
-
+import se.michaelthelin.spotify.requests.data.playlists.AddItemsToPlaylistRequest;
+import se.michaelthelin.spotify.model_objects.specification.Track;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import javax.annotation.PostConstruct;
+import java.util.Arrays;
 
 @Service
 public class SpotifyService {
     @Autowired
-    private SpotifyApi spotifyApi;
+    private UserRepository userRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private SongService songService;
+
+    @Autowired
+    private UserService userService;
 
     @Value("${spotify.client.id}")
     private String clientId;
@@ -30,56 +40,135 @@ public class SpotifyService {
     @Value("${spotify.redirect.uri}")
     private String redirectUri;
 
-    public String getAuthorizationUrl() {
-        return spotifyApi.authorizationCodeUri()
-                .scope("user-read-private user-read-email playlist-modify-public playlist-modify-private")
-                .show_dialog(true)
-                .build()
-                .execute()
-                .toString();
+    private SpotifyApi spotifyApi;
+
+    @PostConstruct
+    public void init() {
+        this.spotifyApi = new SpotifyApi.Builder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRedirectUri(URI.create(redirectUri))
+                .build();
     }
 
-    public void handleCallback(String code) {
+    public String getAuthorizationUrl() {
         try {
-            var authorizationCodeRequest = spotifyApi.authorizationCode(code).build();
-            var authorizationCodeResponse = authorizationCodeRequest.execute();
-
-            spotifyApi.setAccessToken(authorizationCodeResponse.getAccessToken());
-            spotifyApi.setRefreshToken(authorizationCodeResponse.getRefreshToken());
+            return spotifyApi.authorizationCodeUri()
+                    .scope("playlist-modify-public playlist-modify-private")
+                    .build()
+                    .execute()
+                    .toString();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to handle Spotify callback", e);
+            e.printStackTrace();
+            throw new RuntimeException("Failed to get authorization URL: " + e.getMessage());
         }
     }
 
-    public Playlist createPlaylist(Long userId, String name, List<Song> songs) {
+    public String handleCallback(String code) {
         try {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+            AuthorizationCodeCredentials credentials = spotifyApi.authorizationCode(code)
+                    .build()
+                    .execute();
 
-            spotifyApi.setAccessToken(user.getSpotifyAccessToken());
-            String spotifyUserId = spotifyApi.getCurrentUsersProfile().build().execute().getId();
+            spotifyApi.setAccessToken(credentials.getAccessToken());
+            spotifyApi.setRefreshToken(credentials.getRefreshToken());
 
-            CreatePlaylistRequest createPlaylistRequest = spotifyApi.createPlaylist(spotifyUserId, name)
+            // Get current user
+            User user = userRepository.findByUsername(spotifyApi.getCurrentUsersProfile().build().execute().getId());
+            if (user != null) {
+                user.setSpotifyAccessToken(credentials.getAccessToken());
+                user.setSpotifyRefreshToken(credentials.getRefreshToken());
+                userRepository.save(user);
+            }
+
+            return "Successfully authenticated with Spotify!";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Failed to authenticate with Spotify: " + e.getMessage();
+        }
+    }
+
+    public String createPlaylistFromUsername(String username, String name) {
+        User user = userService.getUserById(userService.getUserIdByUsername(username));
+        if (user.getSpotifyAccessToken() == null || user.getSpotifyRefreshToken() == null) {
+            throw new RuntimeException("User not authenticated with Spotify");
+        }
+
+        // Get all songs for the user
+        List<Song> songs = songService.getSongsByUserId(user.getId());
+        if (songs.isEmpty()) {
+            throw new RuntimeException("No songs found for user");
+        }
+
+        // Create playlist
+        String playlistId = createPlaylist(user, name);
+        if (playlistId == null) {
+            throw new RuntimeException("Failed to create playlist");
+        }
+
+        // Add songs to playlist
+        addSongsToPlaylist(user, playlistId, songs);
+
+        return playlistId;
+    }
+
+    public String createPlaylist(User user, String name) {
+        try {
+            String userId = getCurrentUserId(user);
+            CreatePlaylistRequest createPlaylistRequest = spotifyApi.createPlaylist(userId, name)
                     .build();
 
             Playlist playlist = createPlaylistRequest.execute();
+            return playlist.getId();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
 
-            List<String> trackUris = new ArrayList<>();
-            for (Song song : songs) {
-                if (song.getSpotifyId() != null) {
-                    trackUris.add("spotify:track:" + song.getSpotifyId());
+    public void addSongsToPlaylist(User user, String playlistId, List<Song> songs) {
+        try {
+            // Set the access token
+            spotifyApi.setAccessToken(user.getSpotifyAccessToken());
+            
+            List<String> uris = songs.stream()
+                    .map(Song::getUri)
+                    .collect(Collectors.toList());
+            
+            // Add tracks in batches of 100 (Spotify API limit)
+            for (int i = 0; i < uris.size(); i += 20) {
+                int end = Math.min(i + 20, uris.size());
+                List<String> batch = uris.subList(i, end);
+                
+                try {
+                    String[] urisArray = batch.toArray(new String[0]);
+                    
+                    // Create and execute the request
+                    AddItemsToPlaylistRequest addItemsRequest = spotifyApi.addItemsToPlaylist(playlistId, urisArray)
+                            .build();
+                    
+                    // Wait for the request to complete
+                    addItemsRequest.execute();
+                } catch (Exception e) {
+                    System.err.println("Failed to add batch " + (i/20 + 1) + ": " + e.getMessage());
+                    e.printStackTrace();
+                    // Continue with next batch instead of throwing
+                    continue;
                 }
             }
-
-            if (!trackUris.isEmpty()) {
-                spotifyApi.addItemsToPlaylist(playlist.getId(), trackUris.toArray(new String[0]))
-                        .build()
-                        .execute();
-            }
-
-            return playlist;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create playlist", e);
+            System.err.println("Error adding songs to playlist: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to add songs to playlist: " + e.getMessage());
+        }
+    }
+
+    private String getCurrentUserId(User user) {
+        try {
+            return spotifyApi.getCurrentUsersProfile().build().execute().getId();
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to get current user ID: " + e.getMessage());
         }
     }
 } 
