@@ -83,7 +83,7 @@ public class SpotifyService {
                 credentials.getRefreshToken()
             );
 
-            return "Successfully authenticated with Spotify!";
+            return "Successfully authenticated with Spotify! You can now close this window.";
         } catch (Exception e) {
             e.printStackTrace();
             return "Failed to authenticate with Spotify: " + e.getMessage();

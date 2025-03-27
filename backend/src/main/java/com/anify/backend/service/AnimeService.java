@@ -119,7 +119,16 @@ public class AnimeService {
         return webClient.post()
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(String.class);
+                .onStatus(
+                    status -> status.is5xxServerError(),
+                    response -> response.bodyToMono(String.class)
+                        .flatMap(errorBody -> {
+                            System.err.println("AniList API Error Response: " + errorBody);
+                            return Mono.error(new RuntimeException("AniList API Error: " + errorBody));
+                        })
+                )
+                .bodyToMono(String.class)
+                .doOnNext(response -> System.out.println("AniList API Response: " + response));
     }
 
     private List<String> extractAnimeTitles(String response) {

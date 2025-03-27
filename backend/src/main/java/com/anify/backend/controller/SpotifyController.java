@@ -26,8 +26,8 @@ public class SpotifyController {
     private SongService songService;
 
     @GetMapping("/login")
-    public ResponseEntity<String> getLoginUrl() {
-        return ResponseEntity.ok(spotifyService.getAuthorizationUrl());
+    public ResponseEntity<Map<String, String>> getLoginUrl() {
+        return ResponseEntity.ok(Map.of("url", spotifyService.getAuthorizationUrl()));
     }
 
     @GetMapping("/callback")

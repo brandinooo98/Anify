@@ -2,6 +2,8 @@
 
 Anify is a full-stack application that helps anime fans discover and create Spotify playlists from their favorite anime series. The application integrates with AniList to fetch user's anime lists and creates curated Spotify playlists based on song recommendations from aniplaylist.com.
 
+![Anify Demo](./demo.gif)
+
 ## Project Overview
 
 Anify consists of three main components:
@@ -38,12 +40,14 @@ Each component has its own setup instructions and requirements. Please refer to 
 ### Local Development
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/anify.git
    cd anify
    ```
 
 2. Set up each component following their respective READMEs:
+
    - Start the backend server
    - Run the frontend development server
 
